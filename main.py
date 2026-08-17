@@ -22,12 +22,12 @@ def send_telegram_message(message):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        # استلام البيانات سواء أرسلت كـ JSON أو نص مباشر
         data = request.get_json(silent=True)
-        if data and "text" in data:
-            msg_text = data["text"]
+        if data:
+            # إذا أرسل تريدنج فيو النص داخل حقل text أو كرسالة جاهزة
+            msg_text = data.get("text") or str(data)
         else:
-            msg_text = request.data.decode('utf-8') or "تنبيه جديد من ملك الانعكاس"
+            msg_text = request.data.decode('utf-8') or "تنبيه جديد"
             
         send_telegram_message(msg_text)
         return jsonify({"status": "success"}), 200
