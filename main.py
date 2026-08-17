@@ -1,39 +1,44 @@
+import os
 from flask import Flask, request, jsonify
 import requests
 
 app = Flask(__name__)
 
-# التوكن ومعرف قناتك الخاصة
-BOT_TOKEN = "8781535112:AAGZMYuxEnDKscV3DBlc3cKUyohLCyIeX0g"
-CHANNEL_ID = "-1002511482830"
+TELEGRAM_BOT_TOKEN = "7963385750:AAHs_k1f3v9gQ2t9v7z8x6c5b4n3m2l1k0"
+TELEGRAM_CHAT_ID = "-1004362577027"
+
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print(f"Error: {e}")
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json(silent=True)
-    
-    if not data:
-        return jsonify({"status": "error", "message": "No JSON data"}), 400
-
-    message_text = data.get("text", "إشارة جديدة من مؤشر King of Reversals")
-
-    telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHANNEL_ID,
-        "text": str(message_text)
-    }
-
     try:
-        response = requests.post(telegram_url, json=payload, timeout=10)
-        result = response.json()
-
-        if response.ok and result.get("ok") is True:
-            return jsonify({"status": "success"}), 200
+        # استلام البيانات سواء أرسلت كـ JSON أو نص مباشر
+        data = request.get_json(silent=True)
+        if data and "text" in data:
+            msg_text = data["text"]
         else:
-            return jsonify({"status": "telegram_error", "details": result}), 502
+            msg_text = request.data.decode('utf-8') or "تنبيه جديد من ملك الانعكاس"
+            
+        send_telegram_message(msg_text)
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
-    except requests.RequestException as e:
-        return jsonify({"status": "error", "details": str(e)}), 502
+@app.route('/', methods=['GET'])
+def home():
+    return "Bot is running successfully!", 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
