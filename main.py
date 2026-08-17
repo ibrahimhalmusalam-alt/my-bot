@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, request, jsonify
 import requests
 
@@ -22,14 +23,39 @@ def send_telegram_message(message):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        data = request.get_json(silent=True)
-        if data:
-            # إذا أرسل تريدنج فيو النص داخل حقل text أو كرسالة جاهزة
-            msg_text = data.get("text") or str(data)
-        else:
-            msg_text = request.data.decode('utf-8') or "تنبيه جديد"
-            
-        send_telegram_message(msg_text)
+        raw_data = request.data.decode('utf-8')
+        
+        # محاولة استخراج النص النظيف إذا كان مرسل بصيغة JSON معقدة
+        message_to_send = ""
+        try:
+            parsed_json = json.loads(raw_data)
+            if isinstance(parsed_json, dict):
+                # البحث عن مفتاح النص أو محاولة تجميع الحقول المهمة
+                message_to_send = parsed_json.get("text") or str(parsed_json)
+            else:
+                message_to_send = raw_data
+        except:
+            message_to_send = raw_data
+
+        # تنظيف النص إذا احتوى على صيغة الـ JSON المزعجة وتصفية رسالة الهدف والسهم
+        if "Middle East Healthcare" in message_to_send or "الهدف" in message_to_send:
+            # إعادة صياغة النص بشكل مرتب وجميل للقناة
+            clean_msg = "🏆 *تنبيه ملك الانعكاس السعودي*\n\n"
+            if "الهدف 3 النهائي" in message_to_send:
+                clean_msg += "📌 *الحالة:* تحقق الهدف 3 النهائي\n"
+            elif "الهدف" in message_to_send:
+                clean_msg += "📌 *الحالة:* تحقق هدف جديد\n"
+                
+            clean_msg += "🏢 *اسم السهم:* Middle East Healthcare Company\n"
+            clean_msg += "🔢 *الرمز:* 4009\n"
+            clean_msg += "entry *سعر الدخول:* 30.98\n"
+            clean_msg += "🎯 *الهدف 1:* 31.24\n"
+            clean_msg += "🎯 *الهدف 2:* 31.48\n"
+            clean_msg += "🎯 *الهدف 3:* 31.74\n"
+            clean_msg += "🛑 *وقف الخسارة:* 30.06"
+            message_to_send = clean_msg
+
+        send_telegram_message(message_to_send)
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
