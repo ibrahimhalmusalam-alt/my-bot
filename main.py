@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
 import requests
+import os
 
 app = Flask(__name__)
 
-BOT_TOKEN = "7547073289:AAGZMYuxEnDKscV3DBlc3cKUyohLCyIeX0g"
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = "-1004362577027"
 
 @app.route('/webhook', methods=['POST'])
