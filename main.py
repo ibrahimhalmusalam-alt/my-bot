@@ -9,36 +9,87 @@ CHANNEL_ID = "-1004362577027"
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        data = request.get_json(silent=True)
-        
-        if not data:
-            return jsonify({"success": False, "error": "No JSON data received"}), 400
+        print("\n==============================")
+        print("📩 WEBHOOK RECEIVED")
+        print("Headers:", dict(request.headers))
+        print("Raw Body:", request.get_data(as_text=True))
 
-        message_text = data.get("text", "تنبيه جديد من المؤشر")
+        data = request.get_json(silent=True)
+
+        print("JSON DATA:", data)
+
+        if not data:
+            print("❌ No JSON received")
+            return jsonify({
+                "success": False,
+                "error": "No JSON data received"
+            }), 400
+
+        message_text = data.get("text")
+
+        if not message_text:
+            print("❌ No text field")
+            return jsonify({
+                "success": False,
+                "error": "No text field in JSON",
+                "received": data
+            }), 400
 
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
         payload = {
             "chat_id": CHANNEL_ID,
             "text": message_text
         }
-        
-        response = requests.post(url, json=payload, timeout=10)
-        telegram_result = response.json()
+
+        print("📤 Sending to Telegram...")
+        print("Chat ID:", CHANNEL_ID)
+        print("Message:", message_text)
+
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=15
+        )
+
+        print("📥 Telegram HTTP Status:", response.status_code)
+        print("📥 Telegram Response:", response.text)
+
+        try:
+            telegram_result = response.json()
+        except Exception:
+            telegram_result = {
+                "raw_response": response.text
+            }
 
         if not telegram_result.get("ok"):
+            print("❌ TELEGRAM REJECTED MESSAGE")
+
             return jsonify({
-                "success": False, 
+                "success": False,
                 "telegram_error": telegram_result
-            }, 500)
+            }), 500
+
+        print("✅ TELEGRAM ACCEPTED MESSAGE")
+        print("==============================\n")
 
         return jsonify({
-            "success": True, 
+            "success": True,
             "telegram": telegram_result
-        }, 200)
+        }), 200
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        print("🔥 SERVER ERROR:", str(e))
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(
+        host='0.0.0.0',
+        port=5000
+    )
 
