@@ -7,12 +7,11 @@ app = Flask(__name__)
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHANNEL_ID = "-1004362577027"
 
+# حفظ رسالة بداية الصفقة لكل سهم
+active_trades = {}
+
 
 def clean_and_format(text):
-    """
-    تنسيق رسائل TradingView بدون تداخل بين الدخول
-    والأهداف ووقف الخسارة.
-    """
     try:
         stock_name = (
             text.split("اسم السهم:")[1].split("|")[0].strip()
@@ -30,17 +29,17 @@ def clean_and_format(text):
         )
 
         # ==========================================
-        # 1. تحقق الهدف
+        # 🎯 تحقيق هدف
         # ==========================================
         if "تحقق الهدف" in text:
 
             target = "غير معروف"
 
-            if "تحقق الهدف 1" in text:
+            if "الهدف المحقق: 1" in text:
                 target = "1"
-            elif "تحقق الهدف 2" in text:
+            elif "الهدف المحقق: 2" in text:
                 target = "2"
-            elif "تحقق الهدف 3" in text:
+            elif "الهدف المحقق: 3" in text:
                 target = "3"
 
             change_pct = (
@@ -48,24 +47,37 @@ def clean_and_format(text):
                 if "التغير:" in text else ""
             )
 
-            msg = (
-                f"🏆 تم تحقيق الهدف {target} بنجاح!\n\n"
-                f"📌 السهم: {stock_name}\n"
-                f"🏷 الرمز: {symbol}"
-            )
+            if target == "3":
+                msg = (
+                    "🏆🎉🎉 الهدف الثالث تحقق! 🎉🎉🏆\n\n"
+                    "🔥 اكتملت الصفقة بنجاح!\n\n"
+                )
+            elif target == "2":
+                msg = (
+                    "🎯🔥 الهدف الثاني تحقق! 🔥🎯\n\n"
+                    "👏 الصفقة مستمرة نحو الهدف النهائي!\n\n"
+                )
+            else:
+                msg = (
+                    "🎯✨ الهدف الأول تحقق! ✨🎯\n\n"
+                    "💪 بداية ممتازة والصفقة مستمرة!\n\n"
+                )
+
+            msg += f"📌 السهم: {stock_name}\n"
+            msg += f"🏷 الرمز: {symbol}"
 
             if current_price:
                 msg += f"\n💰 السعر الحالي: {current_price}"
 
             if change_pct:
-                msg += f"  |  📈 التغير: {change_pct}"
+                msg += f"\n📈 التغير: {change_pct}"
 
-            return msg
+            return msg, "target", symbol, target
 
         # ==========================================
-        # 2. وقف الخسارة
+        # 🛑 وقف الخسارة
         # ==========================================
-        elif "وقف الخسارة" in text and "دخول" not in text:
+        if "وقف الخسارة" in text and "دخول" not in text:
 
             stop_price = (
                 text.split("وقف الخسارة:")[1].split("|")[0].strip()
@@ -73,7 +85,7 @@ def clean_and_format(text):
             )
 
             msg = (
-                f"🛑 ضرب وقف الخسارة\n\n"
+                "🛑💥 وقف الخسارة\n\n"
                 f"📌 السهم: {stock_name}\n"
                 f"🏷 الرمز: {symbol}"
             )
@@ -84,12 +96,12 @@ def clean_and_format(text):
             if stop_price:
                 msg += f"\n📉 سعر الوقف: {stop_price}"
 
-            return msg
+            return msg, "stop", symbol, None
 
         # ==========================================
-        # 3. صفقة جديدة
+        # 🚀 صفقة جديدة
         # ==========================================
-        elif "دخول" in text or "شراء" in text or "صفقة جديدة" in text:
+        if "دخول" in text or "شراء" in text or "صفقة جديدة" in text:
 
             entry_price = (
                 text.split("سعر الدخول:")[1].split("|")[0].strip()
@@ -117,7 +129,7 @@ def clean_and_format(text):
             )
 
             msg = (
-                f"🚀 صفقة جديدة\n\n"
+                "🚀🔥 صفقة جديدة 🔥🚀\n\n"
                 f"📌 السهم: {stock_name}\n"
                 f"🏷 الرمز: {symbol}"
             )
@@ -130,35 +142,29 @@ def clean_and_format(text):
 
             if t1 or t2 or t3:
                 msg += "\n\n🎯 الأهداف:"
-
                 if t1:
-                    msg += f"\n• الهدف 1: {t1}"
-
+                    msg += f"\n🥇 الهدف 1: {t1}"
                 if t2:
-                    msg += f"\n• الهدف 2: {t2}"
-
+                    msg += f"\n🥈 الهدف 2: {t2}"
                 if t3:
-                    msg += f"\n• الهدف 3: {t3}"
+                    msg += f"\n🥉 الهدف 3: {t3}"
 
             if stop_loss:
                 msg += f"\n\n🛑 وقف الخسارة: {stop_loss}"
 
-            return msg
+            return msg, "entry", symbol, None
 
-        # ==========================================
-        # 4. أي رسالة غير معروفة
-        # ==========================================
-        return text
+        return text, "unknown", symbol, None
 
-    except Exception as e:
-        print(f"❌ Formatting error: {e}")
-        return text
+    except Exception:
+        return text, "unknown", "N/A", None
 
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
 
     try:
+        # استقبال JSON من TradingView
         data = request.get_json(silent=True)
 
         if not data or "text" not in data:
@@ -167,8 +173,11 @@ def webhook():
                 "error": "Invalid JSON or missing text"
             }), 400
 
-        message_text = data.get("text")
-        final_message = clean_and_format(message_text)
+        message_text = data.get("text", "")
+
+        final_message, event_type, symbol, target = clean_and_format(
+            message_text
+        )
 
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -177,34 +186,82 @@ def webhook():
             "text": final_message
         }
 
-        response = requests.post(
-            url,
-            json=payload,
-            timeout=15
-        )
+        # ==========================================
+        # 🚀 بداية صفقة
+        # ==========================================
+        if event_type == "entry":
 
-        telegram_result = response.json()
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=15
+            )
 
-        # Telegram رفض الرسالة
-        if not telegram_result.get("ok"):
-            print("❌ Telegram Error:")
-            print(telegram_result)
+            telegram_result = response.json()
+
+            if telegram_result.get("ok"):
+
+                message_id = telegram_result["result"]["message_id"]
+
+                # حفظ رسالة بداية الصفقة
+                active_trades[symbol] = message_id
 
             return jsonify({
-                "success": False,
-                "telegram_error": telegram_result
-            }), 500
+                "success": telegram_result.get("ok", False)
+            }), 200
 
-        # Telegram قبل الرسالة
-        print("✅ Telegram message sent successfully")
+        # ==========================================
+        # 🎯 هدف أو 🛑 وقف
+        # ==========================================
+        elif event_type in ("target", "stop"):
 
-        return jsonify({
-            "success": True
-        }), 200
+            entry_message_id = active_trades.get(symbol)
+
+            # إذا وجدنا بداية الصفقة → اقتباسها
+            if entry_message_id:
+
+                payload["reply_parameters"] = {
+                    "message_id": entry_message_id
+                }
+
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=15
+            )
+
+            telegram_result = response.json()
+
+            # إذا كانت الرسالة الأخيرة للصفقة الثالثة
+            # أو وقف الخسارة → ننهي الصفقة
+            if telegram_result.get("ok"):
+
+                if event_type == "target" and target == "3":
+                    active_trades.pop(symbol, None)
+
+                elif event_type == "stop":
+                    active_trades.pop(symbol, None)
+
+            return jsonify({
+                "success": telegram_result.get("ok", False)
+            }), 200
+
+        # ==========================================
+        # أي رسالة أخرى
+        # ==========================================
+        else:
+
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=15
+            )
+
+            return jsonify({
+                "success": response.ok
+            }), 200
 
     except Exception as e:
-
-        print(f"❌ Webhook Error: {e}")
 
         return jsonify({
             "success": False,
