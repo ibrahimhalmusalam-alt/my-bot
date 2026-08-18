@@ -9,35 +9,56 @@ CHANNEL_ID = "-1004362577027"
 
 def clean_and_format(text):
     """
-    تستخرج فقط المهم من الرسالة الطويلة وتنسقها بشكل مرتب
+    استخراج وتنسيق رسائل تريدينج فيو بشكل عمودي وأنيق
     """
     try:
-        # استخراج اسم السهم والرمز
-        # نبحث عن السهم والرمز في النص الأصلي وننظفهم
-        if "اسم السهم:" in text:
-            stock_name = text.split("اسم السهم:")[1].split("|")[0].strip()
-        else:
-            stock_name = "غير محدد"
+        # استخراج العناصر الأساسية
+        stock_name = text.split("اسم السهم:")[1].split("|")[0].strip() if "اسم السهم:" in text else "غير محدد"
+        symbol = text.split("الرمز:")[1].split("|")[0].strip() if "الرمز:" in text else "N/A"
+        entry_price = text.split("سعر الدخول:")[1].split("|")[0].strip() if "سعر الدخول:" in text else ""
+        current_price = text.split("السعر الحالي:")[1].split("|")[0].strip() if "السعر الحالي:" in text else ""
+        t1 = text.split("الهدف 1:")[1].split("|")[0].strip() if "الهدف 1:" in text else ""
+        t2 = text.split("الهدف 2:")[1].split("|")[0].strip() if "الهدف 2:" in text else ""
+        t3 = text.split("الهدف 3:")[1].split("|")[0].strip() if "الهدف 3:" in text else ""
+        stop_loss = text.split("وقف الخسارة:")[1].split("|")[0].strip() if "وقف الخسارة:" in text else ""
 
-        if "الرمز:" in text:
-            symbol = text.split("الرمز:")[1].split("|")[0].strip()
-        else:
-            symbol = "N/A"
+        # 1. تنسيق رسالة صفقة جديدة
+        if "دخول" in text or "صفقة جديدة" in text:
+            msg = f"🚀 صفقة جديدة\n\n📌 السهم: {stock_name}\n🏷 الرمز: {symbol}"
+            if entry_price:
+                msg += f"\n💵 سعر الدخول: {entry_price}"
+            if current_price:
+                msg += f"\n📍 السعر الحالي: {current_price}"
+            if t1 or t2 or t3:
+                msg += "\n\n🎯 الأهداف:"
+                if t1: msg += f"\n• الهدف 1: {t1}"
+                if t2: msg += f"\n• الهدف 2: {t2}"
+                if t3: msg += f"\n• الهدف 3: {t3}"
+            if stop_loss:
+                msg += f"\n\n🛑 وقف الخسارة: {stop_loss}"
+            return msg
 
-        # تحديد نوع الرسالة
-        if "تحقق الهدف" in text:
-            # استخراج رقم الهدف
+        # 2. تنسيق رسالة تحقيق الهدف
+        elif "تحقق الهدف" in text:
             target = "غير معروف"
-            if "الهدف 1" in text and "الهدف المحقق: 1" in text: target = "1"
-            elif "الهدف 2" in text and "الهدف المحقق: 2" in text: target = "2"
-            elif "الهدف 3" in text and "الهدف المحقق: 3" in text: target = "3"
+            if "الهدف المحقق: 1" in text: target = "1"
+            elif "الهدف المحقق: 2" in text: target = "2"
+            elif "الهدف المحقق: 3" in text: target = "3"
             
-            return f"🏆 تم تحقيق الهدف {target} بنجاح!\n\n📌 السهم: {stock_name}\n🏷 الرمز: {symbol}"
+            change_pct = text.split("التغير:")[1].split("|")[0].strip() if "التغير:" in text else ""
+            
+            msg = f"🏆 تم تحقيق الهدف {target} بنجاح!\n\n📌 السهم: {stock_name}\n🏷 الرمز: {symbol}"
+            if current_price and change_pct:
+                msg += f"\n💰 السعر: {current_price}  |  📈 الربح: {change_pct}"
+            return msg
         
-        elif "دخول" in text:
-            return f"🚀 صفقة جديدة\n\n📌 السهم: {stock_name}\n🏷 الرمز: {symbol}\n💵 ابدأ المتابعة!"
+        # 3. تنسيق رسالة وقف الخسارة
+        elif "وقف الخسارة" in text:
+            msg = f"🛑 ضرب وقف الخسارة\n\n📌 السهم: {stock_name}\n🏷 الرمز: {symbol}"
+            if current_price:
+                msg += f"\n💰 السعر الحالي: {current_price}"
+            return msg
 
-        # إذا لم تكن أي من الحالات السابقة، نرجع النص الأصلي كما هو ولكن مرتب
         return text
     except:
         return text
