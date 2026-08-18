@@ -24,9 +24,13 @@ def clean_and_format(text):
             text.split("السعر الحالي:")[1].split("|")[0].strip()
             if "السعر الحالي:" in text else ""
         )
+        change_pct = (
+            text.split("التغير:")[1].split("|")[0].strip()
+            if "التغير:" in text else ""
+        )
 
         # ==========================================
-        # 1. إغلاق الصفقة بعد تحقيق هدف (التحديث الجديد)
+        # 1. إغلاق الصفقة بعد تحقيق هدف
         # ==========================================
         if "closed_after_target" in text or "إيقاف الصفقة بهدف" in text:
             stop_price = (
@@ -39,6 +43,7 @@ def clean_and_format(text):
                 f"🏷 الرمز: {symbol}"
             )
             if current_price: msg += f"\n💰 السعر الحالي: {current_price}"
+            if change_pct: msg += f"\n📈 الربح: {change_pct}"
             if stop_price: msg += f"\n📉 سعر الوقف: {stop_price}"
             return msg, "stop", symbol, None
 
@@ -56,6 +61,7 @@ def clean_and_format(text):
             
             msg += f"📌 السهم: {stock_name}\n🏷 الرمز: {symbol}"
             if current_price: msg += f"\n💰 السعر الحالي: {current_price}"
+            if change_pct: msg += f"\n📈 الربح: {change_pct}"
             return msg, "target", symbol, target
 
         # ==========================================
@@ -65,6 +71,7 @@ def clean_and_format(text):
             stop_price = (text.split("وقف الخسارة:")[1].split("|")[0].strip() if "وقف الخسارة:" in text else "")
             msg = "🛑💥 وقف الخسارة\n\n" f"📌 السهم: {stock_name}\n" f"🏷 الرمز: {symbol}"
             if current_price: msg += f"\n💰 السعر الحالي: {current_price}"
+            if change_pct: msg += f"\n📉 الخسارة: {change_pct}"
             if stop_price: msg += f"\n📉 سعر الوقف: {stop_price}"
             return msg, "stop", symbol, None
 
@@ -81,6 +88,7 @@ def clean_and_format(text):
             msg = "🚀🔥 صفقة جديدة 🔥🚀\n\n" f"📌 السهم: {stock_name}\n" f"🏷 الرمز: {symbol}"
             if entry_price: msg += f"\n💵 سعر الدخول: {entry_price}"
             if current_price: msg += f"\n📍 السعر الحالي: {current_price}"
+            if change_pct: msg += f"\n📈 التغير: {change_pct}"
             if t1 or t2 or t3:
                 msg += "\n\n🎯 الأهداف:"
                 if t1: msg += f"\n🥇 الهدف 1: {t1}"
