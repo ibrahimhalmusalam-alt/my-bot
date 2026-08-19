@@ -14,7 +14,6 @@ CHANNEL_ID = "-1004362577027"
 
 # =========================================================
 # الصفقة النشطة
-# نخزن آخر رسالة فقط لضمان الاقتباس المتسلسل
 # =========================================================
 
 active_trades = {}
@@ -46,7 +45,11 @@ def extract_target_number(text):
     if match:
         return match.group(1)
 
-    if "تحقق الهدف 3" in text or "الهدف 3" in text:
+    match = re.search(r"closed_target_([123])", text)
+    if match:
+        return match.group(1)
+
+    if "تحقق الهدف 3" in text or "الهدف 3" in text or "الهدف 3 النهائي" in text:
         return "3"
     if "تحقق الهدف 2" in text or "الهدف 2" in text:
         return "2"
@@ -57,23 +60,28 @@ def extract_target_number(text):
 
 
 # =========================================================
-# تحديد نوع التنبيه (ترتيب الأولويات المعدل والاصح)
+# تحديد نوع التنبيه (منطق دقيق يمنع تداخل تفاصيل السعر)
 # =========================================================
 
 def detect_event(text):
-    # 1. أولاً: فحص الإغلاق بعد تحقيق هدف (يجب أن يكون بالأعلى لكي لا يسرقه فحص الهدف العادي)
-    if "closed_after_target_" in text or "إيقاف الصفقة بهدف" in text:
-        return "stop_after_target"
-
-    # 2. ثانياً: فحص وقف الخسارة الصريح
-    if "closed_stop_loss" in text or "وقف الخسارة" in text or "وقف الخساره" in text:
-        return "stop"
-
-    # 3. ثالثاً: فحص تحقيق الهدف العادي
-    if "تحقق الهدف" in text or "الهدف المحقق" in text:
+    # 1. الإغلاق بعد تحقيق هدف (أو اكتمال الهدف النهائي)
+    if "closed_after_target_" in text or "closed_target_" in text or "إيقاف الصفقة بهدف" in text or "اكتمل الهدف" in text:
+        # إذا كانت الحالة مرتبطة بهدف نهائي أو إغلاق بعد هدف، نحددها كهدف أو إغلاق هدف
+        if "closed_target_3" in text or "الهدف 3 النهائي" in text or "اكتمل الهدف 3" in text:
+            return "target"
+        if "closed_after_target_" in text:
+            return "stop_after_target"
         return "target"
 
-    # 4. رابعاً: بداية الصفقة
+    # 2. وقف الخسارة الفعلي (يجب أن يكون الحدث الأساسي وقف وليس مجرد كلمة في الجدول)
+    if "closed_stop_loss" in text or "أغلق الصفقة عند وقف" in text or text.startswith("وقف الخسارة"):
+        return "stop"
+
+    # 3. تحقيق الهدف العادي (تحقق الهدف 1، 2، أو الحالة تحتوي على رقم محقق)
+    if "تحقق الهدف" in text or "الهدف المحقق" in text or "الحالة: 1" in text or "الحالة: 2" in text or "الحالة: 3" in text:
+        return "target"
+
+    # 4. بداية الصفقة الجديدة
     if "بداية صفقة شراء" in text or "صفقة جديدة" in text:
         return "entry"
 
