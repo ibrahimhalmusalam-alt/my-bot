@@ -57,31 +57,23 @@ def extract_target_number(text):
 
 
 # =========================================================
-# تحديد نوع التنبيه (تم تعديل الأولوية ليكون الهدف أولاً)
+# تحديد نوع التنبيه (ترتيب الأولويات المعدل والاصح)
 # =========================================================
 
 def detect_event(text):
-    # -----------------------------------------------------
-    # 🎯 تحقيق هدف (أولوية قصوى لكي لا تتداخله كلمة active)
-    # -----------------------------------------------------
-    if "تحقق الهدف" in text or text.startswith("تحقق") or "الهدف المحقق" in text:
-        return "target"
-
-    # -----------------------------------------------------
-    # 🛡️ وقف بعد تحقيق هدف
-    # -----------------------------------------------------
+    # 1. أولاً: فحص الإغلاق بعد تحقيق هدف (يجب أن يكون بالأعلى لكي لا يسرقه فحص الهدف العادي)
     if "closed_after_target_" in text or "إيقاف الصفقة بهدف" in text:
         return "stop_after_target"
 
-    # -----------------------------------------------------
-    # 🛑 وقف خسارة
-    # -----------------------------------------------------
+    # 2. ثانياً: فحص وقف الخسارة الصريح
     if "closed_stop_loss" in text or "وقف الخسارة" in text or "وقف الخساره" in text:
         return "stop"
 
-    # -----------------------------------------------------
-    # 🚀 بداية الصفقة
-    # -----------------------------------------------------
+    # 3. ثالثاً: فحص تحقيق الهدف العادي
+    if "تحقق الهدف" in text or "الهدف المحقق" in text:
+        return "target"
+
+    # 4. رابعاً: بداية الصفقة
     if "بداية صفقة شراء" in text or "صفقة جديدة" in text:
         return "entry"
 
@@ -176,8 +168,12 @@ def clean_and_format(text):
                 f"📌 السهم: {stock_name}\n"
                 f"🏷 الرمز: {symbol}"
             )
+            
             if current_price:
                 msg += f"\n💰 السعر الحالي: {current_price}"
+            
+            if change_pct:
+                msg += f"\n📈 التغير: {change_pct}"
 
             return {
                 "message": msg,
@@ -206,6 +202,8 @@ def clean_and_format(text):
             )
             if current_price:
                 msg += f"\n💰 السعر الحالي: {current_price}"
+            if change_pct:
+                msg += f"\n📈 التغير: {change_pct}"
             if stop_price:
                 msg += f"\n📉 سعر الوقف: {stop_price}"
 
@@ -335,7 +333,7 @@ def webhook():
             }), 200
 
         # =================================================
-        # 🎯 TARGET / STOP / STOP_AFTER_TARGET (أحداث متسلسلة)
+        # 🎯 TARGET / STOP / STOP_AFTER_TARGET
         # =================================================
         if event_type in ["target", "stop", "stop_after_target"]:
             trade = active_trades.get(symbol)
@@ -351,7 +349,6 @@ def webhook():
 
             new_message_id = result["result"]["message_id"]
 
-            # إزالة أو تحديث تتبع الصفقة
             if event_type == "target" and target == "3":
                 active_trades.pop(symbol, None)
             elif event_type in ["stop", "stop_after_target"]:
