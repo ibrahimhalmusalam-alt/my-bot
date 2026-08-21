@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 import os
 import re
+from apscheduler.schedulers.background import BackgroundScheduler # <-- إضافة مكتبة الجدول فقط
 
 app = Flask(__name__)
 
@@ -125,6 +126,18 @@ def send_telegram_message(message, reply_to_message_id=None):
     response = requests.post(url, json=payload, timeout=15)
     return response.json() if response.ok else {"ok": False}
 
+# <-- إضافة دالة الإرسال الصباحي فقط
+def send_morning_guidelines():
+    msg = (
+        "☀️ إرشادات ما قبل الافتتاح (ملك الإنعكاس السعودي):\n\n"
+        "⚠️ تذكير هام لإدارة المحفظة:\n"
+        "1️⃣ لا تدخل بكامل المحفظة في صفقة واحدة أبداً.\n"
+        "2️⃣ وزع السيولة على عدة صفقات لحماية رأس المال.\n"
+        "3️⃣ التزم بوقف الخسارة واعرف هدفك مسبقاً.\n\n"
+        "بالتوفيق للجميع 📊"
+    )
+    send_telegram_message(msg)
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -157,7 +170,7 @@ def webhook():
             reply_id = trade.get("message_id") if trade else None
             result = send_telegram_message(message, reply_to_message_id=reply_id)
             if not result.get("ok") and reply_id: result = send_telegram_message(message)
-            
+           
             if result.get("ok"):
                 new_id = result["result"]["message_id"]
                 if event_type == "target" and parsed["target"] == "3": active_trades.pop(symbol, None)
@@ -171,5 +184,10 @@ def webhook():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
+    # <-- بدء المجدول
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(send_morning_guidelines, 'cron', hour=9, minute=0)
+    scheduler.start()
+    
     app.run(host='0.0.0.0', port=5000)
 
