@@ -186,7 +186,7 @@ def webhook():
 if __name__ == '__main__':
     # <-- بدء المجدول
     scheduler = BackgroundScheduler()
-    scheduler.add_job(send_morning_guidelines, 'cron', hour=9, minute=0)
+    scheduler.add_job(send_morning_guidelines, 'cron', hour=16, minute=11)
     scheduler.start()
     
     app.run(host='0.0.0.0', port=5000)
