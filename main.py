@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 import requests
 import os
 import re
-from apscheduler.schedulers.background import BackgroundScheduler # <-- إضافة مكتبة الجدول فقط
 
 app = Flask(__name__)
 
@@ -41,7 +40,7 @@ def extract_target_number(text):
     if match: return match.group(1)
     match = re.search(r"closed_target_([123])", text)
     if match: return match.group(1)
-    
+   
     if "تحقق الهدف 3" in text or "الهدف 3" in text or "الهدف 3 النهائي" in text: return "3"
     if "تحقق الهدف 2" in text or "الهدف 2" in text: return "2"
     if "تحقق الهدف 1" in text or "الهدف 1" in text: return "1"
@@ -126,18 +125,6 @@ def send_telegram_message(message, reply_to_message_id=None):
     response = requests.post(url, json=payload, timeout=15)
     return response.json() if response.ok else {"ok": False}
 
-# <-- إضافة دالة الإرسال الصباحي فقط
-def send_morning_guidelines():
-    msg = (
-        "☀️ إرشادات ما قبل الافتتاح (ملك الإنعكاس السعودي):\n\n"
-        "⚠️ تذكير هام لإدارة المحفظة:\n"
-        "1️⃣ لا تدخل بكامل المحفظة في صفقة واحدة أبداً.\n"
-        "2️⃣ وزع السيولة على عدة صفقات لحماية رأس المال.\n"
-        "3️⃣ التزم بوقف الخسارة واعرف هدفك مسبقاً.\n\n"
-        "بالتوفيق للجميع 📊"
-    )
-    send_telegram_message(msg)
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -184,10 +171,5 @@ def webhook():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
-    # <-- بدء المجدول
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(send_morning_guidelines, 'cron', hour=19, minute=13)
-    scheduler.start()
-    
     app.run(host='0.0.0.0', port=5000)
 
